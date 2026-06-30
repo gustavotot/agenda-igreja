@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda da Igreja</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F7F6F3;
+    --surface: #FFFFFF;
+    --surface2: #F0EEE9;
+    --border: #E2DED7;
+    --border-strong: #C8C4BC;
+    --text: #1A1916;
+    --text-2: #5C5A55;
+    --text-3: #9B9890;
+    --accent: #2563EB;
+    --accent-bg: #EFF4FF;
+    --success: #16A34A;
+    --success-bg: #F0FDF4;
+    --warning: #B45309;
+    --warning-bg: #FFFBEB;
+    --warning-border: #FDE68A;
+    --danger: #DC2626;
+    --danger-bg: #FEF2F2;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.5rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .topbar-icon svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
+
+  .sync-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-3);
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    margin-left: auto;
+  }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .sync-dot.syncing { background: var(--warning); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 56px); }
+
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.25rem;
+    overflow-y: auto;
+  }
+
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .cal-nav-btn {
+    width: 30px; height: 30px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-2);
+    font-size: 16px;
+  }
+  .cal-nav-btn:hover { background: var(--surface2); }
+  .cal-month-label { font-size: 14px; font-weight: 600; color: var(--text); }
+
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-dow { text-align: center; font-size: 11px; color: var(--text-3); padding: 4px 0 6px; font-weight: 500; }
+  .cal-cell {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    padding-top: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    position: relative;
+    transition: background 0.1s;
+  }
+  .cal-cell:hover:not(.empty) { background: var(--surface2); }
+  .cal-cell.empty { cursor: default; }
+  .cal-cell.today { background: var(--accent-bg); color: var(--accent); font-weight: 700; }
+  .cal-cell.selected { background: var(--accent) !important; color: #fff !important; }
+  .cal-cell .dots { display: flex; gap: 2px; margin-top: 2px; }
+  .cdot { width: 5px; height: 5px; border-radius: 50%; }
+  .cal-cell.selected .cdot { background: rgba(255,255,255,0.8) !important; }
+
+  .legend { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  .legend-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); margin-bottom: 8px; }
+  .legend-items { display: flex; flex-direction: column; gap: 5px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .main { padding: 1.5rem; overflow-y: auto; }
+
+  .day-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 1.25rem; }
+  .day-title { font-size: 20px; font-weight: 700; color: var(--text); }
+  .day-sub { font-size: 14px; color: var(--text-3); }
+
+  .section-label {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-3);
+    margin-bottom: 8px;
+  }
+
+  .events-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.5rem; }
+
+  .event-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 12px 14px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .event-stripe { width: 4px; border-radius: 4px; align-self: stretch; flex-shrink: 0; }
+  .event-body { flex: 1; min-width: 0; }
+  .event-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .event-detail { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .event-who { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+  .event-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-3); padding: 2px;
+    border-radius: 4px; line-height: 1;
+    font-size: 18px;
+  }
+  .event-del:hover { color: var(--danger); background: var(--danger-bg); }
+
+  .empty-state {
+    background: var(--surface);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 14px;
+    margin-bottom: 1.5rem;
+  }
+
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+  }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-field { display: flex; flex-direction: column; gap: 4px; }
+  .form-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+  .form-input, .form-select {
+    padding: 8px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    font-size: 14px;
+    color: var(--text);
+    background: var(--surface);
+    font-family: inherit;
+    width: 100%;
+    transition: border-color 0.15s;
+  }
+  .form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  }
+
+  .conflict-box {
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--warning);
+    margin: 10px 0;
+    display: none;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .conflict-box.show { display: flex; }
+
+  .btn-create {
+    width: 100%;
+    padding: 10px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+    font-family: inherit;
+    transition: filter 0.15s;
+  }
+  .btn-create:hover { filter: brightness(0.92); }
+  .btn-create:disabled { background: var(--border-strong); cursor: not-allowed; filter: none; }
+
+  .no-day {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%;
+    color: var(--text-3);
+    gap: 10px;
+    font-size: 14px;
+  }
+  .no-day-icon { font-size: 40px; opacity: 0.4; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1A1916; color: #fff;
+    padding: 10px 20px; border-radius: 20px;
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transition: opacity 0.2s;
+    pointer-events: none; z-index: 999;
+    white-space: nowrap;
+    max-width: 90vw;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 700px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-icon">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+  </div>
+  <div class="topbar-title">Agenda da Igreja</div>
+  <div class="sync-badge" id="sync-badge">
+    <div class="sync-dot" id="sync-dot"></div>
+    <span id="sync-label">Planilha</span>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+      <span class="cal-month-label" id="cal-month-label"></span>
+      <button class="cal-nav-btn" onclick="changeMonth(1)">&#8594;</button>
+    </div>
+    <div class="cal-grid" id="cal-grid">
+      <div class="cal-dow">D</div><div class="cal-dow">S</div><div class="cal-dow">T</div>
+      <div class="cal-dow">Q</div><div class="cal-dow">Q</div><div class="cal-dow">S</div>
+      <div class="cal-dow">S</div>
+    </div>
+    <div class="legend">
+      <div class="legend-title">Categorias</div>
+      <div class="legend-items">
+        <div class="legend-item"><div class="legend-dot" style="background:#2563EB"></div>Ensaio</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#16A34A"></div>GL</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#D97706"></div>Crew</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7C3AED"></div>Confraternização</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#DC2626"></div>Evento</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#9B9890"></div>Outros</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main" id="main-panel">
+    <div class="no-day" id="no-day-msg">
+      <div class="no-day-icon">📅</div>
+      <div>Seleciona um dia no calendário</div>
+    </div>
+    <div id="day-content" style="display:none">
+      <div class="day-header">
+        <div class="day-title" id="day-title"></div>
+        <div class="day-sub" id="day-sub"></div>
+      </div>
+
+      <div class="section-label">Eventos do dia</div>
+      <div class="events-wrap" id="events-wrap"></div>
+
+      <div class="section-label">Novo evento</div>
+      <div class="form-card">
+        <div class="form-row full">
+          <div class="form-field">
+            <label class="form-label">Responsável</label>
+            <input class="form-input" id="f-resp" type="text" placeholder="Ex: João Silva">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label">Categoria</label>
+            <select class="form-select" id="f-cat" onchange="checkConflict()">
+              <option value="">Escolhe...</option>
+              <option value="Ensaio">Ensaio</option>
+              <option value="GL">GL</option>
+              <option value="Crew">Crew</option>
+              <option value="Confraternização">Confraternização</option>
+              <option value="Evento">Evento</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label">Local</label>
+            <select class="form-select" id="f-local" onchange="checkConflict()">
+              <option value="">Escolhe...</option>
+              <option value="Auditório">Auditório</option>
+              <option value="Foyer">Foyer</option>
+              <option value="Kids Sala 1">Kids Sala 1</option>
+              <option value="Kids Sala 2">Kids Sala 2</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label">Início</label>
+            <input class="form-input" id="f-inicio" type="time" onchange="checkConflict()">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Fim</label>
+            <input class="form-input" id="f-fim" type="time" onchange="checkConflict()">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label">Contacto</label>
+            <input class="form-input" id="f-contato" type="text" placeholder="Ex: 933652941">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Qtd. participantes</label>
+            <input class="form-input" id="f-qnt" type="number" placeholder="Ex: 6">
+          </div>
+        </div>
+        <div class="form-row full">
+          <div class="form-field">
+            <label class="form-label">Observações</label>
+            <input class="form-input" id="f-obs" type="text" placeholder="Opcional">
+          </div>
+        </div>
+
+        <div class="conflict-box" id="conflict-box">
+          ⚠️ <span id="conflict-text"></span>
+        </div>
+
+        <button class="btn-create" id="btn-create" onclick="criarEvento()">Criar evento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIGURAÇÃO
+// ─────────────────────────────────────────────
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx5XH8WbABelulTNbjoqYCIhLT4oAOVZTxOoCYxw4XWhoEpG4MZRSGutJfAHK8DI_ERkA/exec';
+
+const CAT_COLOR = {
+  'Ensaio':'#2563EB',
+  'GL':'#16A34A',
+  'Crew':'#D97706',
+  'Confraternização':'#7C3AED',
+  'Evento':'#DC2626',
+  'Outros':'#9B9890'
+};
+
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DAYS_LONG = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+
+let currentYear, currentMonth;
+let selectedDate = null;
+let calEvents = {}; // key 'YYYY-MM-DD' -> array de eventos
+const today = new Date();
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+window.onload = () => {
+  currentYear = today.getFullYear();
+  currentMonth = today.getMonth();
+  renderCalendar();
+  loadMonthEvents();
+};
+
+function toKey(y,m,d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+
+function changeMonth(dir) {
+  currentMonth += dir;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  selectedDate = null;
+  document.getElementById('day-content').style.display = 'none';
+  document.getElementById('no-day-msg').style.display = 'flex';
+  renderCalendar();
+  loadMonthEvents();
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('cal-grid');
+  const headers = Array.from(grid.querySelectorAll('.cal-dow'));
+  grid.innerHTML = '';
+  headers.forEach(h => grid.appendChild(h));
+
+  document.getElementById('cal-month-label').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell empty';
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = toKey(currentYear, currentMonth, d);
+    const evs = calEvents[key] || [];
+    const isToday = today.getFullYear()===currentYear && today.getMonth()===currentMonth && today.getDate()===d;
+    const isSel = selectedDate === key;
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (isToday?' today':'') + (isSel?' selected':'');
+    cell.innerHTML = `${d}<div class="dots">${evs.slice(0,3).map(e=>`<div class="cdot" style="background:${isSel?'rgba(255,255,255,0.8)':(CAT_COLOR[e.categoria]||'#9B9890')}"></div>`).join('')}</div>`;
+    cell.addEventListener('click', ()=>selectDay(key,d));
+    grid.appendChild(cell);
+  }
+}
+
+// ─────────────────────────────────────────────
+// COMUNICAÇÃO COM A PLANILHA
+// ─────────────────────────────────────────────
+async function loadMonthEvents() {
+  setSyncing(true);
+  try {
+    const url = `${SCRIPT_URL}?action=list&month=${currentMonth+1}&year=${currentYear}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    calEvents = {};
+    (data.events || []).forEach(ev => {
+      const d = new Date(ev.dataInicio);
+      const key = toKey(d.getFullYear(), d.getMonth(), d.getDate());
+      if (!calEvents[key]) calEvents[key] = [];
+      calEvents[key].push(ev);
+    });
+
+    renderCalendar();
+    if (selectedDate) renderDayEvents(selectedDate);
+  } catch (e) {
+    showToast('Erro ao carregar a planilha.');
+  }
+  setSyncing(false);
+}
+
+function setSyncing(s) {
+  document.getElementById('sync-dot').className = 'sync-dot' + (s?' syncing':'');
+  document.getElementById('sync-label').textContent = s ? 'A sincronizar...' : 'Planilha';
+}
+
+// ─────────────────────────────────────────────
+// SELEÇÃO DE DIA
+// ─────────────────────────────────────────────
+function selectDay(key, d) {
+  selectedDate = key;
+  renderCalendar();
+  document.getElementById('no-day-msg').style.display = 'none';
+  document.getElementById('day-content').style.display = 'block';
+
+  const dow = new Date(currentYear, currentMonth, d).getDay();
+  document.getElementById('day-title').textContent = `${d} de ${MONTHS[currentMonth]}`;
+  document.getElementById('day-sub').textContent = DAYS_LONG[dow];
+
+  clearForm();
+  renderDayEvents(key);
+}
+
+function renderDayEvents(key) {
+  const wrap = document.getElementById('events-wrap');
+  const evs = calEvents[key] || [];
+  wrap.innerHTML = '';
+  if (!evs.length) {
+    wrap.innerHTML = '<div class="empty-state">Nenhum evento agendado para este dia.</div>';
+    return;
+  }
+  evs.forEach(ev => {
+    const card = document.createElement('div');
+    card.className = 'event-card';
+    const inicioT = new Date(ev.dataInicio);
+    const fimT = ev.dataFinal ? new Date(ev.dataFinal) : null;
+    const horaStr = fimT
+      ? `${pad(inicioT.getHours())}:${pad(inicioT.getMinutes())} – ${pad(fimT.getHours())}:${pad(fimT.getMinutes())} · `
+      : '';
+    card.innerHTML = `
+      <div class="event-stripe" style="background:${CAT_COLOR[ev.categoria]||'#9B9890'}"></div>
+      <div class="event-body">
+        <div class="event-name">${ev.categoria || 'Evento'} — ${ev.local || ''}</div>
+        <div class="event-detail">${horaStr}${ev.participantes ? ev.participantes + ' pessoas' : ''}</div>
+        <div class="event-who">Responsável: ${ev.responsavel || '—'}${ev.contato ? ' · ' + ev.contato : ''}</div>
+      </div>
+      <button class="event-del" title="Remover" onclick="apagarEvento(${ev.row},'${key}')">×</button>`;
+    wrap.appendChild(card);
+  });
+}
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+// ─────────────────────────────────────────────
+// VERIFICAÇÃO DE CONFLITO (client-side, rápida)
+// ─────────────────────────────────────────────
+function checkConflict() {
+  if (!selectedDate) return;
+  const local = document.getElementById('f-local').value;
+  const ini = document.getElementById('f-inicio').value;
+  const fim = document.getElementById('f-fim').value;
+  const box = document.getElementById('conflict-box');
+
+  if (!local) { box.classList.remove('show'); return; }
+  const evs = calEvents[selectedDate] || [];
+
+  const conflict = evs.find(ev => {
+    if (ev.local !== local) return false;
+    if (!ini || !ev.dataInicio) return true;
+    const evIni = new Date(ev.dataInicio);
+    const evFim = ev.dataFinal ? new Date(ev.dataFinal) : evIni;
+    const evIniStr = pad(evIni.getHours())+':'+pad(evIni.getMinutes());
+    const evFimStr = pad(evFim.getHours())+':'+pad(evFim.getMinutes());
+    return ini < evFimStr && fim > evIniStr;
+  });
+
+  if (conflict) {
+    const ci = new Date(conflict.dataInicio);
+    const cf = conflict.dataFinal ? new Date(conflict.dataFinal) : ci;
+    document.getElementById('conflict-text').textContent =
+      `${local} já está reservado das ${pad(ci.getHours())}:${pad(ci.getMinutes())} às ${pad(cf.getHours())}:${pad(cf.getMinutes())}, por ${conflict.responsavel || 'alguém'} (${conflict.categoria}).`;
+    box.classList.add('show');
+  } else {
+    box.classList.remove('show');
+  }
+}
+
+// ─────────────────────────────────────────────
+// CRIAR EVENTO
+// ─────────────────────────────────────────────
+async function criarEvento() {
+  const responsavel = document.getElementById('f-resp').value.trim();
+  const categoria = document.getElementById('f-cat').value;
+  const local = document.getElementById('f-local').value;
+  const ini = document.getElementById('f-inicio').value;
+  const fim = document.getElementById('f-fim').value;
+  const contato = document.getElementById('f-contato').value.trim();
+  const qnt = document.getElementById('f-qnt').value.trim();
+  const obs = document.getElementById('f-obs').value.trim();
+
+  if (!responsavel || !categoria || !local || !ini || !fim) {
+    showToast('Preenche responsável, categoria, local e horário.');
+    return;
+  }
+
+  const dataInicio = `${selectedDate}T${ini}:00`;
+  const dataFinal = `${selectedDate}T${fim}:00`;
+
+  document.getElementById('btn-create').disabled = true;
+  setSyncing(true);
+
+  try {
+    const params = new URLSearchParams({
+      action: 'create',
+      dataInicio, dataFinal, categoria, local,
+      responsavel, contato, participantes: qnt, observacoes: obs
+    });
+    const resp = await fetch(SCRIPT_URL, { method: 'POST', body: params });
+    const result = await resp.json();
+
+    if (result.conflict) {
+      document.getElementById('conflict-text').textContent = result.message;
+      document.getElementById('conflict-box').classList.add('show');
+      showToast('Não foi possível criar — horário ocupado.');
+    } else if (result.success) {
+      showToast('Evento criado na planilha!');
+      clearForm();
+      await loadMonthEvents();
+    } else {
+      showToast('Erro: ' + (result.error || 'tenta novamente.'));
+    }
+  } catch (e) {
+    showToast('Erro de ligação à planilha.');
+  }
+
+  document.getElementById('btn-create').disabled = false;
+  setSyncing(false);
+}
+
+// ─────────────────────────────────────────────
+// REMOVER EVENTO
+// ─────────────────────────────────────────────
+async function apagarEvento(row, key) {
+  if (!confirm('Remover este evento da planilha?')) return;
+  setSyncing(true);
+  try {
+    const params = new URLSearchParams({ action: 'delete', row });
+    await fetch(SCRIPT_URL, { method: 'POST', body: params });
+    showToast('Evento removido.');
+    await loadMonthEvents();
+  } catch (e) {
+    showToast('Erro ao remover.');
+  }
+  setSyncing(false);
+}
+
+function clearForm() {
+  ['f-resp','f-cat','f-local','f-inicio','f-fim','f-contato','f-qnt','f-obs'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('conflict-box').classList.remove('show');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
