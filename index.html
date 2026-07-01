@@ -312,6 +312,12 @@
       <div class="form-card">
         <div class="form-row full">
           <div class="form-field">
+            <label class="form-label">Título do evento</label>
+            <input class="form-input" id="f-titulo" type="text" placeholder="Ex: Ensaio Páscoa, GL Alta Voltagem...">
+          </div>
+        </div>
+        <div class="form-row full">
+          <div class="form-field">
             <label class="form-label">Responsável</label>
             <input class="form-input" id="f-resp" type="text" placeholder="Ex: João Silva">
           </div>
@@ -326,7 +332,6 @@
               <option value="Crew">Crew</option>
               <option value="Confraternização">Confraternização</option>
               <option value="Evento">Evento</option>
-              <option value="Outros">Outros</option>
               <option value="Outros">Formação</option>
             </select>
           </div>
@@ -524,7 +529,8 @@ function renderDayEvents(key) {
     card.innerHTML = `
       <div class="event-stripe" style="background:${CAT_COLOR[ev.categoria]||'#9B9890'}"></div>
       <div class="event-body">
-        <div class="event-name">${ev.categoria || 'Evento'} — ${ev.local || ''}</div>
+        <div class="event-name">${ev.titulo || ev.categoria || 'Evento'}</div>
+        <div class="event-detail" style="font-size:12px;color:var(--text-3);margin-top:1px">${ev.categoria} · ${ev.local || ''}</div>
         <div class="event-detail">${horaStr}${ev.participantes ? ev.participantes + ' pessoas' : ''}</div>
         <div class="event-who">Responsável: ${ev.responsavel || '—'}${ev.contato ? ' · ' + ev.contato : ''}</div>
       </div>
@@ -573,6 +579,7 @@ function checkConflict() {
 // CRIAR EVENTO
 // ─────────────────────────────────────────────
 async function criarEvento() {
+  const titulo = document.getElementById('f-titulo').value.trim();
   const responsavel = document.getElementById('f-resp').value.trim();
   const categoria = document.getElementById('f-cat').value;
   const local = document.getElementById('f-local').value;
@@ -596,8 +603,8 @@ async function criarEvento() {
   try {
     const params = new URLSearchParams({
       action: 'create',
-      dataInicio, dataFinal, categoria, local,
-      responsavel, contato, participantes: qnt, observacoes: obs
+      dataInicio, dataFinal, categoria, titulo,
+      local, responsavel, contato, participantes: qnt, observacoes: obs
     });
     const resp = await fetch(SCRIPT_URL, { method: 'POST', body: params });
     const result = await resp.json();
@@ -639,7 +646,7 @@ async function apagarEvento(row, key) {
 }
 
 function clearForm() {
-  ['f-resp','f-cat','f-local','f-inicio','f-fim','f-contato','f-qnt','f-obs'].forEach(id => {
+  ['f-titulo','f-resp','f-cat','f-local','f-inicio','f-fim','f-contato','f-qnt','f-obs'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('conflict-box').classList.remove('show');
