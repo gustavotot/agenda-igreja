@@ -308,7 +308,10 @@
       <div class="section-label">Eventos do dia</div>
       <div class="events-wrap" id="events-wrap"></div>
 
-      <div class="section-label">Novo evento</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="section-label" id="form-section-label" style="margin-bottom:0">Novo evento</div>
+        <button id="btn-cancel-edit" onclick="cancelarEdicao()" style="display:none;font-size:12px;background:none;border:1px solid var(--border-strong);border-radius:6px;padding:3px 10px;cursor:pointer;color:var(--text-2)">✕ Cancelar edição</button>
+      </div>
       <div class="form-card">
         <div class="form-row full">
           <div class="form-field">
@@ -377,7 +380,7 @@
           ⚠️ <span id="conflict-text"></span>
         </div>
 
-        <button class="btn-create" id="btn-create" onclick="criarEvento()">Criar evento</button>
+        <button class="btn-create" id="btn-create" onclick="criarEvento()"><span id="btn-create-label">Criar evento</span></button>
       </div>
     </div>
   </div>
@@ -405,7 +408,8 @@ const DAYS_LONG = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quin
 
 let currentYear, currentMonth;
 let selectedDate = null;
-let calEvents = {}; // key 'YYYY-MM-DD' -> array de eventos
+let calEvents = {};
+let editingRow = null; // null = criar, número = editar linha // key 'YYYY-MM-DD' -> array de eventos
 const today = new Date();
 
 // ─────────────────────────────────────────────
@@ -534,7 +538,10 @@ function renderDayEvents(key) {
         <div class="event-detail">${horaStr}${ev.participantes ? ev.participantes + ' pessoas' : ''}</div>
         <div class="event-who">Responsável: ${ev.responsavel || '—'}${ev.contato ? ' · ' + ev.contato : ''}</div>
       </div>
-      <button class="event-del" title="Remover" onclick="apagarEvento(${ev.row},'${key}')">×</button>`;
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button class="event-del" title="Editar" style="color:var(--accent)" onclick="preencherEdicao(${JSON.stringify(ev).replace(/'/g, '&#39;')})">✏️</button>
+        <button class="event-del" title="Remover" onclick="apagarEvento(${ev.row},'${key}')">×</button>
+      </div>`;
     wrap.appendChild(card);
   });
 }
@@ -575,6 +582,45 @@ function checkConflict() {
   }
 }
 
+
+// ─────────────────────────────────────────────
+// EDITAR EVENTO
+// ─────────────────────────────────────────────
+function preencherEdicao(ev) {
+  editingRow = ev.row;
+
+  // Preenche campos
+  const ini = ev.dataInicio ? ev.dataInicio.slice(11,16) : '';
+  const fim = ev.dataFinal  ? ev.dataFinal.slice(11,16)  : '';
+
+  document.getElementById('f-titulo').value   = ev.titulo       || '';
+  document.getElementById('f-resp').value     = ev.responsavel  || '';
+  document.getElementById('f-cat').value      = ev.categoria    || '';
+  document.getElementById('f-local').value    = ev.local        || '';
+  document.getElementById('f-inicio').value   = ini;
+  document.getElementById('f-fim').value      = fim;
+  document.getElementById('f-contato').value  = ev.contato      || '';
+  document.getElementById('f-qnt').value      = ev.participantes|| '';
+  document.getElementById('f-obs').value      = ev.observacoes  || '';
+
+  // Actualiza UI
+  document.getElementById('form-section-label').textContent = '✏️ Editar evento';
+  document.getElementById('btn-create-label').textContent   = 'Guardar alterações';
+  document.getElementById('btn-cancel-edit').style.display  = 'block';
+  document.getElementById('conflict-box').classList.remove('show');
+
+  // Scroll até ao formulário
+  document.getElementById('btn-create').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelarEdicao() {
+  editingRow = null;
+  clearForm();
+  document.getElementById('form-section-label').textContent = 'Novo evento';
+  document.getElementById('btn-create-label').textContent   = 'Criar evento';
+  document.getElementById('btn-cancel-edit').style.display  = 'none';
+}
+
 // ─────────────────────────────────────────────
 // CRIAR EVENTO
 // ─────────────────────────────────────────────
@@ -594,15 +640,19 @@ async function criarEvento() {
     return;
   }
 
-  const dataInicio = `${selectedDate}T${ini}:00`;
-  const dataFinal = `${selectedDate}T${fim}:00`;
+  // Se estiver em modo edição, usa a data do evento original; se não, usa o dia seleccionado
+  const dateBase = selectedDate;
+  const dataInicio = `${dateBase}T${ini}:00`;
+  const dataFinal = `${dateBase}T${fim}:00`;
 
   document.getElementById('btn-create').disabled = true;
   setSyncing(true);
 
   try {
+    const isEditing = editingRow !== null;
     const params = new URLSearchParams({
-      action: 'create',
+      action: isEditing ? 'edit' : 'create',
+      ...(isEditing ? { row: editingRow } : {}),
       dataInicio, dataFinal, categoria, titulo,
       local, responsavel, contato, participantes: qnt, observacoes: obs
     });
@@ -614,8 +664,8 @@ async function criarEvento() {
       document.getElementById('conflict-box').classList.add('show');
       showToast('Não foi possível criar — horário ocupado.');
     } else if (result.success) {
-      showToast('Evento criado na planilha!');
-      clearForm();
+      showToast(editingRow ? 'Evento actualizado!' : 'Evento criado na planilha!');
+      cancelarEdicao();
       await loadMonthEvents();
     } else {
       showToast('Erro: ' + (result.error || 'tenta novamente.'));
@@ -646,10 +696,14 @@ async function apagarEvento(row, key) {
 }
 
 function clearForm() {
+  editingRow = null;
   ['f-titulo','f-resp','f-cat','f-local','f-inicio','f-fim','f-contato','f-qnt','f-obs'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('conflict-box').classList.remove('show');
+  document.getElementById('form-section-label').textContent = 'Novo evento';
+  document.getElementById('btn-create-label').textContent   = 'Criar evento';
+  document.getElementById('btn-cancel-edit').style.display  = 'none';
 }
 
 function showToast(msg) {
