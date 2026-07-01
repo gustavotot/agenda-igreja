@@ -289,7 +289,8 @@
         <div class="legend-item"><div class="legend-dot" style="background:#D97706"></div>Crew</div>
         <div class="legend-item"><div class="legend-dot" style="background:#7C3AED"></div>Confraternização</div>
         <div class="legend-item"><div class="legend-dot" style="background:#DC2626"></div>Evento</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#9B9890"></div>Formação</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#9B9890"></div>Outros</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#0891B2"></div>Formação</div>
       </div>
     </div>
   </div>
@@ -335,7 +336,8 @@
               <option value="Crew">Crew</option>
               <option value="Confraternização">Confraternização</option>
               <option value="Evento">Evento</option>
-              <option value="Outros">Formação</option>
+              <option value="Outros">Outros</option>
+              <option value="Formação">Formação</option>
             </select>
           </div>
           <div class="form-field">
@@ -400,7 +402,8 @@ const CAT_COLOR = {
   'Crew':'#D97706',
   'Confraternização':'#7C3AED',
   'Evento':'#DC2626',
-  'Outros':'#9B9890'
+  'Outros':'#9B9890',
+  'Formação':'#0891B2'
 };
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -533,9 +536,12 @@ function renderDayEvents(key) {
     card.innerHTML = `
       <div class="event-stripe" style="background:${CAT_COLOR[ev.categoria]||'#9B9890'}"></div>
       <div class="event-body">
-        <div class="event-name">${ev.titulo || ev.categoria || 'Evento'}</div>
-        <div class="event-detail" style="font-size:12px;color:var(--text-3);margin-top:1px">${ev.categoria} · ${ev.local || ''}</div>
-        <div class="event-detail">${horaStr}${ev.participantes ? ev.participantes + ' pessoas' : ''}</div>
+        <div class="event-name">${ev.titulo || '(sem título)'}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+          <span style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:11px;color:var(--text-2);font-weight:500">${ev.categoria}</span>
+          <span style="font-size:12px;color:var(--text-3)">${ev.local || ''}</span>
+        </div>
+        <div class="event-detail" style="margin-top:4px">${horaStr}${ev.participantes ? ev.participantes + ' pessoas' : ''}</div>
         <div class="event-who">Responsável: ${ev.responsavel || '—'}${ev.contato ? ' · ' + ev.contato : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px">
