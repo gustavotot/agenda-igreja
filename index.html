@@ -533,9 +533,10 @@ function renderDayEvents(key) {
     card.className = 'event-card';
     const inicioT = new Date(ev.dataInicio);
     const fimT = ev.dataFinal ? new Date(ev.dataFinal) : null;
-    const horaStr = fimT
+    const horaStr = (fimT && (fimT.getHours() || fimT.getMinutes()))
       ? `${pad(inicioT.getHours())}:${pad(inicioT.getMinutes())} – ${pad(fimT.getHours())}:${pad(fimT.getMinutes())} · `
       : '';
+
     card.innerHTML = `
       <div class="event-stripe" style="background:${CAT_COLOR[ev.categoria]||'#9B9890'}"></div>
       <div class="event-body">
@@ -548,9 +549,13 @@ function renderDayEvents(key) {
         <div class="event-who">Responsável: ${ev.responsavel || '—'}${ev.contato ? ' · ' + ev.contato : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px">
-        <button class="event-del" title="Editar" style="color:var(--accent)" onclick="preencherEdicao(${ev.row})">✏️</button>
-        <button class="event-del" title="Remover" onclick="apagarEvento(${ev.row},'${key}')">×</button>
+        <button class="event-del btn-edit-ev" title="Editar" style="color:var(--accent)">✏️</button>
+        <button class="event-del btn-del-ev" title="Remover">×</button>
       </div>`;
+
+    card.querySelector('.btn-edit-ev').addEventListener('click', () => preencherEdicao(ev.row));
+    card.querySelector('.btn-del-ev').addEventListener('click', () => apagarEvento(ev.row, key));
+
     wrap.appendChild(card);
   });
 }
