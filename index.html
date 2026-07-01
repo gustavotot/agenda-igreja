@@ -412,7 +412,8 @@ const DAYS_LONG = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quin
 let currentYear, currentMonth;
 let selectedDate = null;
 let calEvents = {};
-let editingRow = null; // null = criar, número = editar linha // key 'YYYY-MM-DD' -> array de eventos
+let editingRow = null; // null = criar, número = editar linha
+let eventMap = {};    // row -> evento completo // key 'YYYY-MM-DD' -> array de eventos
 const today = new Date();
 
 // ─────────────────────────────────────────────
@@ -480,11 +481,13 @@ async function loadMonthEvents() {
     const data = await resp.json();
 
     calEvents = {};
+    eventMap = {};
     (data.events || []).forEach(ev => {
       const d = new Date(ev.dataInicio);
       const key = toKey(d.getFullYear(), d.getMonth(), d.getDate());
       if (!calEvents[key]) calEvents[key] = [];
       calEvents[key].push(ev);
+      eventMap[ev.row] = ev;
     });
 
     renderCalendar();
@@ -545,7 +548,7 @@ function renderDayEvents(key) {
         <div class="event-who">Responsável: ${ev.responsavel || '—'}${ev.contato ? ' · ' + ev.contato : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px">
-        <button class="event-del" title="Editar" style="color:var(--accent)" onclick="preencherEdicao(${JSON.stringify(ev).replace(/'/g, '&#39;')})">✏️</button>
+        <button class="event-del" title="Editar" style="color:var(--accent)" onclick="preencherEdicao(${ev.row})">✏️</button>
         <button class="event-del" title="Remover" onclick="apagarEvento(${ev.row},'${key}')">×</button>
       </div>`;
     wrap.appendChild(card);
@@ -592,8 +595,10 @@ function checkConflict() {
 // ─────────────────────────────────────────────
 // EDITAR EVENTO
 // ─────────────────────────────────────────────
-function preencherEdicao(ev) {
-  editingRow = ev.row;
+function preencherEdicao(row) {
+  const ev = eventMap[row];
+  if (!ev) { showToast('Erro ao carregar evento.'); return; }
+  editingRow = row;
 
   // Preenche campos
   const ini = ev.dataInicio ? ev.dataInicio.slice(11,16) : '';
