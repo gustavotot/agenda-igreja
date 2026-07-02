@@ -672,7 +672,7 @@ async function criarEvento() {
       dataInicio, dataFinal, categoria, titulo,
       local, responsavel, contato, participantes: qnt, observacoes: obs
     });
-    const resp = await fetch(SCRIPT_URL, { method: 'POST', body: params });
+    const resp = await fetch(`${SCRIPT_URL}?${params.toString()}`);
     const result = await resp.json();
 
     if (result.conflict) {
@@ -702,7 +702,7 @@ async function apagarEvento(row, key) {
   setSyncing(true);
   try {
     const params = new URLSearchParams({ action: 'delete', row });
-    await fetch(SCRIPT_URL, { method: 'POST', body: params });
+    await fetch(`${SCRIPT_URL}?${params.toString()}`);
     showToast('Evento removido.');
     await loadMonthEvents();
   } catch (e) {
