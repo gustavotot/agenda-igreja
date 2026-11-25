@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agenda da Igreja</title>
+<title>Agenda da Comunidade</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -72,7 +72,18 @@
   .sync-dot.syncing { background: var(--warning); animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  .layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 56px); }
+  .agenda-tabs {
+    display: flex; gap: 8px; padding: 12px 1.5rem;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .agenda-tab {
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-2); border-radius: 8px; padding: 8px 14px;
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .agenda-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .agenda-description { font-size: 12px; color: var(--text-3); margin: -5px 0 12px; }
+  .layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 112px); }
 
   .sidebar {
     background: var(--surface);
@@ -262,12 +273,17 @@
   <div class="topbar-icon">
     <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
   </div>
-  <div class="topbar-title">Agenda da Igreja</div>
+  <div class="topbar-title">Agenda da Comunidade</div>
   <div class="sync-badge" id="sync-badge">
     <div class="sync-dot" id="sync-dot"></div>
     <span id="sync-label">Planilha</span>
   </div>
 </div>
+
+<nav class="agenda-tabs" aria-label="Tipo de agenda">
+  <button class="agenda-tab active" id="tab-salas" onclick="switchAgenda('salas')">Agenda de Salas</button>
+  <button class="agenda-tab" id="tab-eventos" onclick="switchAgenda('eventos')">Agenda de Eventos</button>
+</nav>
 
 <div class="layout">
   <div class="sidebar">
@@ -306,7 +322,8 @@
         <div class="day-sub" id="day-sub"></div>
       </div>
 
-      <div class="section-label">Eventos do dia</div>
+      <div class="section-label" id="events-section-label">Eventos do dia</div>
+      <div class="agenda-description" id="agenda-description">Reservas dos espaços da igreja.</div>
       <div class="events-wrap" id="events-wrap"></div>
 
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -413,8 +430,49 @@ let currentYear, currentMonth;
 let selectedDate = null;
 let calEvents = {};
 let editingRow = null; // null = criar, número = editar linha
-let eventMap = {};    // row -> evento completo // key 'YYYY-MM-DD' -> array de eventos
+let eventMap = {};    // row -> evento completo
+let activeAgenda = 'salas';
 const today = new Date();
+
+const LOCAL_SALAS_HTML = `
+  <select class="form-select" id="f-local" onchange="checkConflict()">
+    <option value="">Escolhe...</option>
+    <option value="Auditório">Auditório</option>
+    <option value="Foyer">Foyer</option>
+    <option value="Kids Sala 1">Kids Sala 1</option>
+    <option value="Kids Sala 2">Kids Sala 2</option>
+  </select>`;
+
+function switchAgenda(agenda) {
+  if (agenda === activeAgenda) return;
+
+  activeAgenda = agenda;
+  editingRow = null;
+
+  document.getElementById('tab-salas').classList.toggle('active', agenda === 'salas');
+  document.getElementById('tab-eventos').classList.toggle('active', agenda === 'eventos');
+
+  const localField = document.getElementById('f-local');
+  if (agenda === 'eventos') {
+    localField.outerHTML = '<input class="form-input" id="f-local" type="text" placeholder="Ex: Casa da Ana, parque, casa de alguém..." oninput="checkConflict()">';
+    document.getElementById('agenda-description').textContent =
+      'Eventos e encontros da comunidade em casas, parques e outros locais.';
+    document.getElementById('form-section-label').textContent = 'Novo evento';
+    document.getElementById('btn-create-label').textContent = 'Criar evento';
+  } else {
+    localField.outerHTML = LOCAL_SALAS_HTML;
+    document.getElementById('agenda-description').textContent =
+      'Reservas dos espaços da igreja.';
+    document.getElementById('form-section-label').textContent = 'Nova reserva';
+    document.getElementById('btn-create-label').textContent = 'Criar reserva';
+  }
+
+  document.getElementById('events-section-label').textContent =
+    agenda === 'salas' ? 'Reservas do dia' : 'Eventos da comunidade';
+
+  clearForm();
+  loadMonthEvents();
+}
 
 // ─────────────────────────────────────────────
 // INIT
@@ -476,7 +534,7 @@ function renderCalendar() {
 async function loadMonthEvents() {
   setSyncing(true);
   try {
-    const url = `${SCRIPT_URL}?action=list&month=${currentMonth+1}&year=${currentYear}`;
+    const url = `${SCRIPT_URL}?action=list&agenda=${activeAgenda}&month=${currentMonth+1}&year=${currentYear}`;
     const resp = await fetch(url);
     const data = await resp.json();
 
@@ -566,6 +624,10 @@ function pad(n){ return String(n).padStart(2,'0'); }
 // VERIFICAÇÃO DE CONFLITO (client-side, rápida)
 // ─────────────────────────────────────────────
 function checkConflict() {
+  if (activeAgenda === 'eventos') {
+    document.getElementById('conflict-box').classList.remove('show');
+    return;
+  }
   if (!selectedDate) return;
   const local = document.getElementById('f-local').value;
   const ini = document.getElementById('f-inicio').value;
@@ -632,8 +694,10 @@ function preencherEdicao(row) {
 function cancelarEdicao() {
   editingRow = null;
   clearForm();
-  document.getElementById('form-section-label').textContent = 'Novo evento';
-  document.getElementById('btn-create-label').textContent   = 'Criar evento';
+  document.getElementById('form-section-label').textContent =
+    activeAgenda === 'salas' ? 'Nova reserva' : 'Novo evento';
+  document.getElementById('btn-create-label').textContent =
+    activeAgenda === 'salas' ? 'Criar reserva' : 'Criar evento';
   document.getElementById('btn-cancel-edit').style.display  = 'none';
 }
 
@@ -668,6 +732,7 @@ async function criarEvento() {
     const isEditing = editingRow !== null;
     const params = new URLSearchParams({
       action: isEditing ? 'edit' : 'create',
+      agenda: activeAgenda,
       ...(isEditing ? { row: editingRow } : {}),
       dataInicio, dataFinal, categoria, titulo,
       local, responsavel, contato, participantes: qnt, observacoes: obs
@@ -680,9 +745,21 @@ async function criarEvento() {
       document.getElementById('conflict-box').classList.add('show');
       showToast('Não foi possível criar — horário ocupado.');
     } else if (result.success) {
-      showToast(editingRow ? 'Evento actualizado!' : 'Evento criado na planilha!');
+      const warningMessage = result.warning
+        ? 'Aviso: ' + (result.message || 'Existe outro evento no mesmo local e horário. O registo foi guardado.')
+        : '';
+
       cancelarEdicao();
       await loadMonthEvents();
+
+      if (warningMessage) {
+        document.getElementById('conflict-text').textContent = warningMessage;
+        document.getElementById('conflict-box').classList.add('show');
+        showToast('Evento guardado com aviso de sobreposição.');
+      } else {
+        document.getElementById('conflict-box').classList.remove('show');
+        showToast(isEditing ? 'Alterações guardadas!' : 'Evento criado na planilha!');
+      }
     } else {
       showToast('Erro: ' + (result.error || 'tenta novamente.'));
     }
@@ -701,7 +778,7 @@ async function apagarEvento(row, key) {
   if (!confirm('Remover este evento da planilha?')) return;
   setSyncing(true);
   try {
-    const params = new URLSearchParams({ action: 'delete', row });
+    const params = new URLSearchParams({ action: 'delete', agenda: activeAgenda, row });
     await fetch(`${SCRIPT_URL}?${params.toString()}`);
     showToast('Evento removido.');
     await loadMonthEvents();
@@ -717,8 +794,10 @@ function clearForm() {
     document.getElementById(id).value = '';
   });
   document.getElementById('conflict-box').classList.remove('show');
-  document.getElementById('form-section-label').textContent = 'Novo evento';
-  document.getElementById('btn-create-label').textContent   = 'Criar evento';
+  document.getElementById('form-section-label').textContent =
+    activeAgenda === 'salas' ? 'Nova reserva' : 'Novo evento';
+  document.getElementById('btn-create-label').textContent =
+    activeAgenda === 'salas' ? 'Criar reserva' : 'Criar evento';
   document.getElementById('btn-cancel-edit').style.display  = 'none';
 }
 
